@@ -268,6 +268,12 @@ impl<T: Digest + Debug + Write + Clone> EifBuilder<T> {
         self.sign_info.is_some()
     }
 
+    pub fn set_sign_info(&mut self, cert_path: &str, key_path: &str) -> Result<(), String> {
+        self.sign_info = Some(SignEnclaveInfo::new(cert_path, key_path)
+            .map_err(|err| format!("{:?}", err))?);
+        Ok(())
+    }
+
     pub fn add_ramdisk(&mut self, ramdisk_path: &Path) {
         let mut ramdisk_file = File::open(ramdisk_path).expect("Invalid ramdisk path");
         let mut ramdisk = Vec::new();
