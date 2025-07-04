@@ -745,6 +745,7 @@ mod tests {
     mod kms {
         use super::*;
 
+        #[ignore = "Needs AWS_KMS_TEST_KEY_ARN environment variable being set"]
         #[test]
         fn test_kms_sign_key_data_from_invalid_cert_key_info() -> Result<(), std::io::Error> {
             let key_arn =
@@ -756,6 +757,7 @@ mod tests {
             Ok(())
         }
 
+        #[ignore = "Needs AWS_KMS_TEST_KEY_ARN environment variable being set"]
         #[test]
         fn test_kms_sign_key_data_from_valid_key_arn() -> Result<(), std::io::Error> {
             let cert_file_path = generate_certificate_file()?;

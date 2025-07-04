@@ -3,7 +3,7 @@ use crate::utils::eif_reader::EifReader;
 use crate::utils::get_pcrs;
 use aws_config::BehaviorVersion;
 use aws_nitro_enclaves_cose::{
-    crypto::kms::KmsKey, crypto::Openssl, header_map::HeaderMap, CoseSign1,
+    crypto::kms::KmsKey, crypto::Openssl, crypto::SigningPrivateKey, header_map::HeaderMap, CoseSign1,
 };
 use aws_sdk_kms::client::Client;
 use aws_types::region::Region;
@@ -25,6 +25,8 @@ pub enum SignKey {
 
     // KMS signer implementation from Cose library
     KmsKey(Arc<KmsKey>),
+
+    ExternalKey(Box<dyn SigningPrivateKey>),
 }
 
 // Signing key details
@@ -79,6 +81,13 @@ pub struct SignKeyData {
 }
 
 impl SignKeyData {
+    pub fn from_external_key(cert: Vec<u8>, signer: Box<dyn SigningPrivateKey>) -> Self {
+        Self {
+            cert,
+            key: SignKey::ExternalKey(signer),
+        }
+    }
+
     pub fn new(key_location: &str, certificate: &std::path::Path) -> Result<Self, String> {
         let key_info = SignKeyInfo::new(key_location)?;
 
@@ -126,7 +135,7 @@ impl SignKeyData {
                 let runtime = Runtime::new().map_err(|e| e.to_string())?;
                 let key = runtime.block_on(act)?;
                 SignKey::KmsKey(Arc::new(key))
-            }
+            },
         };
 
         Ok(SignKeyData { cert, key })
@@ -166,6 +175,10 @@ impl EifSigner {
                     .await
                     .map_err(|e| format!("Task join error: {}", e))?
                 })?
+            },
+            SignKey::ExternalKey(pkey) => {
+                CoseSign1::new::<Openssl>(payload, &HeaderMap::new(), pkey.as_ref())
+                        .map_err(|e| format!("Failed to create CoseSign1 with external key: {}", e))?
             }
         };
 
