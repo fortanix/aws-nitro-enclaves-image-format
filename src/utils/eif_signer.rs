@@ -354,11 +354,15 @@ impl EifSigner {
         Err("Signature section not found".to_string())
     }
 
-    /// Generates the signature based on the selected method and writes it to the EIF
-    pub fn sign_image(&self, eif_path: &str) -> Result<(), String> {
+    pub fn generate_signature(&self, eif_path: &str) -> Result<Vec<u8>, String> {
         // Read PCRs and check if EIF already has a signature
         let mut eif_reader = EifReader::from_eif(eif_path.into())?;
         let has_signature = eif_reader.signature_section.is_some();
+
+        if has_signature {
+            return Err(String::from("EIF is already signed"));
+        }
+
         let measurements = get_pcrs(
             &mut eif_reader.image_hasher,
             &mut eif_reader.bootstrap_hasher,
@@ -368,12 +372,28 @@ impl EifSigner {
             has_signature,
         )?;
 
-        let signature = self.generate_eif_signature(&measurements)?;
+        self.generate_eif_signature(&measurements)
+    }
+
+    pub fn add_signature(&self, eif_path: &str, signature: Vec<u8>) -> Result<(), String> {
+        let eif_reader = EifReader::from_eif(eif_path.into())?;
+        let has_signature = eif_reader.signature_section.is_some();
+
+        if has_signature {
+            return Err(String::from("EIF is already signed"));
+        }
+
         self.write_signature(eif_path, signature, has_signature)
             .map_err(|e| format!("Failed to write signature to EIF: {}", e))?;
 
         // Update CRC of the EIF
         self.update_crc(eif_path)
+    }
+
+    /// Generates the signature based on the selected method and writes it to the EIF
+    pub fn sign_image(&self, eif_path: &str) -> Result<(), String> {
+        let signature = self.generate_signature(eif_path)?;
+        self.add_signature(eif_path, signature)
     }
 
     pub fn update_crc(&self, eif_path: &str) -> Result<(), String> {
